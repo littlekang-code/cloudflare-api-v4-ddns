@@ -1,7 +1,8 @@
-#!/usr/bin/env bash
-set -o errexit
-set -o nounset
-set -o pipefail
+#!/bin/bash
+
+# set -o errexit
+# set -o nounset
+# set -o pipefail
 
 # Automatically update your CloudFlare DNS record to the IP, Dynamic DNS
 # Can retrieve cloudflare Domain id and list zone's, because, lazy
@@ -26,12 +27,8 @@ set -o pipefail
 
 # default config
 
-# API key, see https://www.cloudflare.com/a/account/my-account,
-# incorrect api-key results in E_UNAUTH error
-CFKEY=
-
-# Username, eg: user@example.com
-CFUSER=
+# API Token, see https://www.cloudflare.com/a/account/my-account,
+CFTOKEN=
 
 # Zone name, eg: example.com
 CFZONE_NAME=
@@ -42,7 +39,7 @@ CFRECORD_NAME=
 # Record type, A(IPv4)|AAAA(IPv6), default IPv4
 CFRECORD_TYPE=A
 
-# Cloudflare TTL for record, between 120 and 86400 seconds
+# Cloudflare TTL for record, between 120 and 86400 seconds, 1-auto
 CFTTL=120
 
 # Ignore local file, update ip anyway
@@ -61,10 +58,9 @@ else
 fi
 
 # get parameter
-while getopts k:u:h:z:t:f: opts; do
+while getopts k:h:z:t:f: opts; do
   case ${opts} in
-    k) CFKEY=${OPTARG} ;;
-    u) CFUSER=${OPTARG} ;;
+    k) CFTOKEN=${OPTARG} ;;
     h) CFRECORD_NAME=${OPTARG} ;;
     z) CFZONE_NAME=${OPTARG} ;;
     t) CFRECORD_TYPE=${OPTARG} ;;
@@ -73,17 +69,19 @@ while getopts k:u:h:z:t:f: opts; do
 done
 
 # If required settings are missing just exit
-if [ "$CFKEY" = "" ]; then
-  echo "Missing api-key, get at: https://www.cloudflare.com/a/account/my-account"
+if [ "$CFTOKEN" = "" ]; then
+  echo "Missing api-token, get at: https://www.cloudflare.com/a/account/my-account"
   echo "and save in ${0} or using the -k flag"
   exit 2
 fi
-if [ "$CFUSER" = "" ]; then
-  echo "Missing username, probably your email-address"
-  echo "and save in ${0} or using the -u flag"
+
+if [ "$CFZONE_NAME" = "" ]; then
+  echo "Missing zonename, what zone do you want to update?"
+  echo "save in ${0} or using the -h flag"
   exit 2
 fi
-if [ "$CFRECORD_NAME" = "" ]; then 
+
+if [ "$CFRECORD_NAME" = "" ]; then
   echo "Missing hostname, what host do you want to update?"
   echo "save in ${0} or using the -h flag"
   exit 2
@@ -120,8 +118,14 @@ if [ -f $ID_FILE ] && [ $(wc -l $ID_FILE | cut -d " " -f 1) == 4 ] \
     CFRECORD_ID=$(sed -n '2,1p' "$ID_FILE")
 else
     echo "Updating zone_identifier & record_identifier"
-    CFZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$CFZONE_NAME" -H "X-Auth-Email: $CFUSER" -H "X-Auth-Key: $CFKEY" -H "Content-Type: application/json" | grep -Po '(?<="id":")[^"]*' | head -1 )
-    CFRECORD_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$CFZONE_ID/dns_records?name=$CFRECORD_NAME" -H "X-Auth-Email: $CFUSER" -H "X-Auth-Key: $CFKEY" -H "Content-Type: application/json"  | grep -Po '(?<="id":")[^"]*' | head -1 )
+
+    CFZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$CFZONE_NAME" \
+      -H "Authorization: Bearer $CFTOKEN" \
+      -H "Content-Type: application/json" | grep -Po '(?<="id":")[^"]*' | head -1 )
+
+    CFRECORD_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$CFZONE_ID/dns_records?name=$CFRECORD_NAME" \
+      -H "Authorization: Bearer $CFTOKEN" \
+      -H "Content-Type: application/json"  | grep -Po '(?<="id":")[^"]*' | head -1 )
     echo "$CFZONE_ID" > $ID_FILE
     echo "$CFRECORD_ID" >> $ID_FILE
     echo "$CFZONE_NAME" >> $ID_FILE
@@ -132,10 +136,9 @@ fi
 echo "Updating DNS to $WAN_IP"
 
 RESPONSE=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$CFZONE_ID/dns_records/$CFRECORD_ID" \
-  -H "X-Auth-Email: $CFUSER" \
-  -H "X-Auth-Key: $CFKEY" \
+  -H "Authorization: Bearer $CFTOKEN" \
   -H "Content-Type: application/json" \
-  --data "{\"id\":\"$CFZONE_ID\",\"type\":\"$CFRECORD_TYPE\",\"name\":\"$CFRECORD_NAME\",\"content\":\"$WAN_IP\", \"ttl\":$CFTTL}")
+  --data "{\"type\":\"$CFRECORD_TYPE\",\"name\":\"$CFRECORD_NAME\",\"content\":\"$WAN_IP\", \"ttl\":$CFTTL}")
 
 if [ "$RESPONSE" != "${RESPONSE%success*}" ] && [ "$(echo $RESPONSE | grep "\"success\":true")" != "" ]; then
   echo "Updated succesfuly!"
