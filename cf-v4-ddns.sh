@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# set -o errexit
-# set -o nounset
-# set -o pipefail
+set -o errexit
+set -o nounset
+set -o pipefail
 
 # Automatically update your CloudFlare DNS record to the IP, Dynamic DNS
 # Can retrieve cloudflare Domain id and list zone's, because, lazy
@@ -16,8 +16,7 @@
 
 
 # Usage:
-# cf-ddns.sh -k cloudflare-api-key \
-#            -u user@example.com \
+# cf-ddns.sh -n cloudflare-api-token \
 #            -h host.example.com \     # fqdn of the record you want to update
 #            -z example.com \          # will show you all zones if forgot, but you need this
 #            -t A|AAAA                 # specify ipv4/ipv6, default: ipv4
@@ -58,9 +57,9 @@ else
 fi
 
 # get parameter
-while getopts k:h:z:t:f: opts; do
+while getopts n:h:z:t:f: opts; do
   case ${opts} in
-    k) CFTOKEN=${OPTARG} ;;
+    n) CFTOKEN=${OPTARG} ;;
     h) CFRECORD_NAME=${OPTARG} ;;
     z) CFZONE_NAME=${OPTARG} ;;
     t) CFRECORD_TYPE=${OPTARG} ;;
@@ -71,7 +70,7 @@ done
 # If required settings are missing just exit
 if [ "$CFTOKEN" = "" ]; then
   echo "Missing api-token, get at: https://www.cloudflare.com/a/account/my-account"
-  echo "and save in ${0} or using the -k flag"
+  echo "and save in ${0} or using the -n flag"
   exit 2
 fi
 
@@ -141,11 +140,11 @@ RESPONSE=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$CFZONE_ID
   --data "{\"type\":\"$CFRECORD_TYPE\",\"name\":\"$CFRECORD_NAME\",\"content\":\"$WAN_IP\", \"ttl\":$CFTTL}")
 
 if [ "$RESPONSE" != "${RESPONSE%success*}" ] && [ "$(echo $RESPONSE | grep "\"success\":true")" != "" ]; then
-  echo "Updated succesfuly!"
+  echo "$CFRECORD_NAME Updated succesfuly!"
   echo $WAN_IP > $WAN_IP_FILE
   exit
 else
-  echo 'Something went wrong :('
+  echo "Update $CFRECORD_NAME Something went wrong :("
   echo "Response: $RESPONSE"
   exit 1
 fi
