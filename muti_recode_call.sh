@@ -15,8 +15,8 @@ set -o pipefail
 # Optional flags:
 #            -f false|true \           # force dns update, disregard local stored ip
 
-
-CF_DDNS_SHELL=./cf-v4-ddns.sh
+CUR_DIR=$(cd "$(dirname "$0")";pwd)
+CF_DDNS_SHELL=$CUR_DIR/cf-v4-ddns.sh
 
 # API Token, see https://www.cloudflare.com/a/account/my-account,
 CFTOKEN=
