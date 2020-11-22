@@ -44,13 +44,18 @@ CFTTL=120
 # Ignore local file, update ip anyway
 FORCE=false
 
-WANIPSITE="http://ipv4.icanhazip.com"
+WANIPSITE1="https://api.myip.com"
+WANIPSITE2="https://api.ipify.org"
+WANIPSITE3="http://ipv4.icanhazip.com/"
+
 
 # Site to retrieve WAN ip, other examples are: bot.whatismyipaddress.com, https://api.ipify.org/ ...
 if [ "$CFRECORD_TYPE" = "A" ]; then
   :
 elif [ "$CFRECORD_TYPE" = "AAAA" ]; then
-  WANIPSITE="http://ipv6.icanhazip.com"
+  WANIPSITE1="https://api64.ipify.org"
+  WANIPSITE2="http://ipv6.icanhazip.com"
+  WANIPSITE3="https://api64.ipify.org"
 else
   echo "$CFRECORD_TYPE specified is invalid, CFRECORD_TYPE can only be A(for IPv4)|AAAA(for IPv6)"
   exit 2
@@ -93,7 +98,17 @@ if [ "$CFRECORD_NAME" != "$CFZONE_NAME" ] && ! [ -z "${CFRECORD_NAME##*$CFZONE_N
 fi
 
 # Get current and old WAN ip
-WAN_IP=`curl -s ${WANIPSITE}`
+WAN_IP=$(curl -s ${WANIPSITE1} | grep -Po '((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}')
+if [ -z "$WAN_IP" ]; then
+  echo "WAN_IP get fail, try another api"
+
+  WAN_IP=$(curl -s ${WANIPSITE2} | grep -Po '((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}')
+  if [ -z "$WAN_IP" ]; then
+    echo "WAN_IP get fail, exit"
+    exit 2
+  fi
+fi
+
 WAN_IP_FILE=$HOME/.cf-wan_ip_$CFRECORD_NAME.txt
 if [ -f $WAN_IP_FILE ]; then
   OLD_WAN_IP=`cat $WAN_IP_FILE`
